@@ -53,7 +53,7 @@ return(list("z"=Z,"lam"=lambda))
 
 # Perform EM for nsteps
 
-EM <- function(W,nsteps,a,b){
+EM <- function(W,nsteps,a,b,eps){
   
 # Initialise Variables
   
@@ -61,7 +61,8 @@ EM <- function(W,nsteps,a,b){
   n <- matrix(0,nrow=K,ncol=K)
   n <- W + t(W)
 
-  lambda <- runif(K,0,10)
+  lambda <- runif(K,10,20)
+
   
   Z <- matrix(0,nrow = K,ncol=K)
   
@@ -69,12 +70,61 @@ EM <- function(W,nsteps,a,b){
   for(t in 1:nsteps){
     step <- EM_step(Z,lambda,W,a,b,K,n)
     Z <- step$z
-    lambda <- step$lam
+    lambda_temp <- step$lam/sum(step$lam)
     
-    return(lambda)
+    if(sqrt(sum((lambda-lambda_temp)^2))<eps) {
+      
+      print(cat('Converge after',t,'steps','\n'))
+      
+      return(lambda_temp)} # Stopping Condition
+    
+    lambda <- lambda_temp 
+    
   }
+  
+   
+  return(lambda)
+  
+}
+
+EM2_step <- function(lambda,W,a,b,K,n){
+
+  temp <- matrix(0,K,K)
+  for(i in 1:K){
+    for(j in 1:K){
+      temp[i,j] <- n[i,j]/(lambda[i]+lambda[j])
+    }
+  }
+  
+  for(i in 1:K){
+    lambda[i] = (a - 1 + sum(W[i,]))/(b+ sum(temp[i,]))
+  }
+
+  return(lambda)
 }
 
 
-rescale <- function(l)l/sum(l)
+
+EM2 <- function(W,nsteps,a,b,eps){
+
+  # Initialise Variables
+
+  K <- length(W[1,])
+  n <- matrix(0,nrow=K,ncol=K)
+  n <- W + t(W)
+  lambda <- runif(K,10,20)
+  
+  for(t in 1:nsteps){
+    lambda_temp <- EM2_step(lambda,W,a,b,K,n)
+    if(sqrt(sum((lambda-lambda_temp)^2))<eps) {
+      
+      print(cat('Converge after',t,'steps','\n'))
+      
+      return(lambda_temp)} # Stopping Condition
+    lambda <- lambda_temp 
+  }
+  return(lambda)
+}
+
+
 

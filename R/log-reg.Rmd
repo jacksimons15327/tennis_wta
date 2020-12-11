@@ -8,18 +8,24 @@ header-includes:
 output:
   pdf_document: default
 ---
-
+<!-- use this to change our working directory -->
+```{r setup, include=FALSE, echo=FALSE}
+require("knitr")
+opts_knit$set(root.dir = "../tennis_wta/rel_files/")
+```
 
 Let's first load in the relevant data (see `tennis.R`)
 ```{r}
-setwd("../tennis_wta/rel_files")
-file_list = list.files(pattern="*.csv")
+file_list = list.files()
 ```
 
 Now we want to compile the data into a better format. We need the input `variables` which should be equal to something of the form: `variables = c('surface', 'winner_id', 'loser_id', 'loser_age', 'winner_age')`
 ```{r}
 load_data <- function(file_list, variables) {
-  for (file_index in 1:length(file_list)) {
+  no_files <- length(file_list)
+  test_file <- file_list[[no_files]]
+  file_list <- file_list[1:(no_files-1)]
+  for (file_index in 1:(no_files-1)) {
     temp_file <- read.csv(file_list[[file_index]])
     reduced_file <- subset(temp_file, select = variables)
     if (file_index==1) {
@@ -33,8 +39,34 @@ load_data <- function(file_list, variables) {
 ```
 Let's now use this function
 ```{r}
-variables <- c('surface', 'winner_id', 'loser_id', 'loser_age', 'winner_age')
-load_data(file_list, variables)
+variables <- c('surface', 'winner_id', 'loser_id', 'winner_age', 'loser_age')
+my_data <- load_data(file_list, variables)
 ```
+Let's see what the data looks like
+```{r}
+head(my_data, 30)
+```
+We notice that the winner and loser ages contain `NA`, so let's set these missing values equal to their mean. Alternatively, we could consider simply removing the corresponding rows.
+```{r}
+missing_winner_ages <- which(is.na(my_data$winner_age))
+missing_loser_ages <- which(is.na(my_data$loser_age))
+my_data$winner_age[missing_winner_ages] <- mean(my_data$winner_age[!is.na(my_data$winner_age)])
+my_data$loser_age[missing_loser_ages] <- mean(my_data$loser_age[!is.na(my_data$loser_age)])
+head(my_data, 30)
+```
+
+Now, for the logistic regression
+
+```{r}
+activ_func <- function(t) {
+  return(1/(1+exp(t)))
+}
+
+
+
+
+
+```
+
 
 

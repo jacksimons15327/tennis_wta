@@ -1,4 +1,4 @@
-setwd("~/Documents/PhD/First Year/Statistical Computing/tennis_wta/tennis_wta/rel_files")
+setwd("~/Documents/Group_Project_1/tennis_wta/tennis_wta/rel_files")
 
 
 file_list = list.files(pattern="*.csv")

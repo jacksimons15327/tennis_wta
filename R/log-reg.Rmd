@@ -19,19 +19,19 @@ Let's first load in the relevant data (see `tennis.R`)
 file_list = list.files()
 ```
 
-Now we want to compile the data into a better format. We need the input `variables` which should be equal to something of the form: `variables = c('surface', 'winner_id', 'loser_id', 'loser_age', 'winner_age')`
+Now we want to compile the data into a better format. We need the input `variables` which should be equal to something of the form: `variables = c('surface', 'winner_id', 'loser_id', 'loser_age', 'winner_age')` - alternatively if it left blank then we will load all the variables
 ```{r}
-load_data <- function(file_list, variables) {
+load_data <- function(file_list, variables=FALSE) {
   no_files <- length(file_list)
-  test_file <- file_list[[no_files]]
-  file_list <- file_list[1:(no_files-1)]
-  for (file_index in 1:(no_files-1)) {
+  for (file_index in 1:no_files) {
     temp_file <- read.csv(file_list[[file_index]])
-    reduced_file <- subset(temp_file, select = variables)
+    if (class(variables)=="character") {
+      temp_file <- subset(temp_file, select = variables)
+    }
     if (file_index==1) {
-      melted_files <- reduced_file
+      melted_files <- temp_file
     } else {
-      melted_files <- rbind(melted_files, reduced_file)
+      melted_files <- rbind(melted_files, temp_file)
     }
   }
   return(melted_files)
@@ -39,34 +39,98 @@ load_data <- function(file_list, variables) {
 ```
 Let's now use this function
 ```{r}
-variables <- c('surface', 'winner_id', 'loser_id', 'winner_age', 'loser_age')
-my_data <- load_data(file_list, variables)
+# variables <- c('surface', 'winner_id', 'loser_id', 'winner_age', 'loser_age')
+my_data <- load_data(file_list)
 ```
 Let's see what the data looks like
 ```{r}
-head(my_data, 30)
-```
-We notice that the winner and loser ages contain `NA`, so let's set these missing values equal to their mean. Alternatively, we could consider simply removing the corresponding rows.
-```{r}
-missing_winner_ages <- which(is.na(my_data$winner_age))
-missing_loser_ages <- which(is.na(my_data$loser_age))
-my_data$winner_age[missing_winner_ages] <- mean(my_data$winner_age[!is.na(my_data$winner_age)])
-my_data$loser_age[missing_loser_ages] <- mean(my_data$loser_age[!is.na(my_data$loser_age)])
-head(my_data, 30)
+head(my_data, 5)
 ```
 
-Now, for the logistic regression
-
+Now, for the logistic regression. We need to create our $D=\{(\bm{x}_i,y_i)\}_{i=1}^{n}$ - we will start off very naively 
 ```{r}
-activ_func <- function(t) {
+trans_data_naive <- function(data_mat, features) {
+  
+  no_feats <- length(features)
+  new_dat <- subset(data_mat, select = features) #select the relewvant features
+  orig_rows <- nrow(new_dat) #number of orginal games (which we double)
+  
+  #flip the dataset
+  for (i in 1:(no_feats/2)) {
+    temp_df <- data.frame(new_dat[,(2*i)], new_dat[,(2*i-1)]) 
+  }
+  colnames(temp_df)=features
+  new_dat <- rbind(new_dat, temp_df)
+  
+  #add the results
+  new_dat$result <- c(rep(1,orig_rows), rep(-1, orig_rows))
+  new_dat$result <- as.numeric(new_dat$result)
+  
+  #change the column names to reflect that we have added result column
+  colnames(new_dat)[1:2] <- c("p1_hand", "p2_hand")
+  
+  #add the bias column
+  new_dat$bias <- 1
+  
+  return(new_dat)
+}
+```
+Now let's look at this data
+```{r}
+features <- c("winner_hand", "loser_hand")
+new_dat <- trans_data_naive(my_data, features)
+head(new_dat)
+```
+We notice that some people do not have a hand are are listed as "" or "U". **Let's choose to remove these from the data set.**
+```{r}
+new_dat <- new_dat[-which(new_dat$p1_hand=="U"),]
+new_dat <- new_dat[-which(new_dat$p1_hand==""),]
+new_dat <- new_dat[-which(new_dat$p2_hand=="U"),]
+new_dat <- new_dat[-which(new_dat$p2_hand==""),]
+unique(new_dat$p2_hand)
+unique(new_dat$p1_hand)
+```
+Let's one hot encode this variable
+```{r}
+new_dat$p1_hand[which(new_dat$p1_hand=="L")] <- 0
+new_dat$p1_hand[which(new_dat$p1_hand=="R")] <- 1
+new_dat$p2_hand[which(new_dat$p2_hand=="L")] <- 0
+new_dat$p2_hand[which(new_dat$p2_hand=="R")] <- 1
+new_dat$p1_hand <- as.numeric(new_dat$p1_hand)
+new_dat$p2_hand <- as.numeric(new_dat$p2_hand)
+```
+We need to separate $y$ and $\bm{x}$.
+```{r}
+y_dat <- subset(new_dat, select=result)
+x_dat <- subset(new_dat, select=-result)
+```
+
+Let's make the logistic regression
+```{r}
+sigma_f <- function(t) {
   return(1/(1+exp(t)))
 }
 
+log_reg_naive <- function(w, x, y) {
+  f <- as.matrix(x)%*%w
+  return(-sum(log(sigma_f(f*y))))
+}
 
+log_reg_naive_grad <- function(w, x, y) {
+  f <- as.matrix(x)%*%w
+  temp <- rep(0,dim(x)[2])
+  for (i in 1:dim(x)[2]) {
+    temp[i] <- sum(sigma_f(f*y)*exp(f*y)*y*x[,i])
+  }
+  return(temp)
+}
 
-
-
+set.seed(2020) #random seed for reproducibility
+w <- rnorm(3) #random initialization
+log_reg_naive(w, x_dat, y_dat)
+optim(rnorm(3), log_reg_naive, x=x_dat, y=y_dat, control=list(maxit=2000), gr=log_reg_naive_grad)
 ```
+
 
 
 
